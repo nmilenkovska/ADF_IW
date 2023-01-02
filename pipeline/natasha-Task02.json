@@ -1,6 +1,16 @@
 {
 	"name": "natasha-Task02",
 	"properties": {
+		"parameters": {
+			"container": {
+				"type": "string",
+				"defaultValue": "input"
+			},
+			"file_name1": {
+				"type": "string",
+				"defaultValue": "leads.csv"
+			}
+		},
 		"annotations": []
 	}
 }
