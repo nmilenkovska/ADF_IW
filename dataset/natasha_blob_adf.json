@@ -1,0 +1,20 @@
+{
+	"name": "natasha_blob_adf",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_blob_adf",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}
