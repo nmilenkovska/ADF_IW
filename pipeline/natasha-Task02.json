@@ -3,7 +3,7 @@
 	"properties": {
 		"activities": [
 			{
-				"name": "Data flow1",
+				"name": "natasha_df_02",
 				"type": "ExecuteDataFlow",
 				"dependsOn": [],
 				"policy": {
@@ -16,7 +16,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"dataflow": {
-						"referenceName": "natasha_df_01",
+						"referenceName": "natasha_df_02",
 						"type": "DataFlowReference",
 						"parameters": {
 							"file_name1": "'leads.csv'",
@@ -27,13 +27,13 @@
 								"container": "input",
 								"file_name_here": "leads.csv"
 							},
-							"incommes": {
+							"incomes": {
 								"container": "input",
 								"file_name_here": "leads.csv"
 							},
-							"sink1": {
-								"container": "input",
-								"file_name_here": "CAIncommesByZip.csv"
+							"output": {
+								"container": "output",
+								"file_name_here": "SanFranciscoIncomes.csv"
 							}
 						}
 					},

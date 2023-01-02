@@ -1,5 +1,5 @@
 {
-	"name": "natasha_df_01",
+	"name": "natasha_df_02",
 	"properties": {
 		"type": "MappingDataFlow",
 		"typeProperties": {
@@ -16,7 +16,7 @@
 						"referenceName": "natasha_blob_adf",
 						"type": "DatasetReference"
 					},
-					"name": "incommes"
+					"name": "incomes"
 				}
 			],
 			"sinks": [
@@ -25,21 +25,26 @@
 						"referenceName": "natasha_blob_adf",
 						"type": "DatasetReference"
 					},
-					"name": "sink1"
+					"name": "output"
 				}
 			],
 			"transformations": [
 				{
-					"name": "join1"
+					"name": "JoinLeadsWithIncomes",
+					"description": "Inner join on 'leads' and 'incomes'"
 				},
 				{
-					"name": "filter1"
+					"name": "SanFrancisco"
+				},
+				{
+					"name": "SelectParticularColumns"
 				}
 			],
 			"scriptLines": [
 				"parameters{",
 				"     file_name1 as string ('leads.csv'),",
-				"     file_name2 as string ('CAIncommesByZip.csv')",
+				"     file_name2 as string ('CAIncommesByZip.csv'),",
+				"     output_file as string ('output.csv')",
 				"}",
 				"source(output(",
 				"          First as string,",
@@ -67,19 +72,30 @@
 				"     allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     ignoreNoFilesFound: false,",
-				"     wildcardPaths:[($file_name2)]) ~> incommes",
-				"leads, incommes join(leads@Zip == incommes@Zip,",
+				"     wildcardPaths:[($file_name2)]) ~> incomes",
+				"leads, incomes join(leads@Zip == incomes@Zip,",
 				"     joinType:'inner',",
 				"     matchType:'exact',",
 				"     ignoreSpaces: false,",
-				"     broadcast: 'auto')~> join1",
-				"join1 filter(City=='San Francisco') ~> filter1",
-				"filter1 sink(allowSchemaDrift: true,",
+				"     broadcast: 'auto')~> JoinLeadsWithIncomes",
+				"SelectParticularColumns filter(City=='San Francisco') ~> SanFrancisco",
+				"JoinLeadsWithIncomes select(mapColumn(",
+				"          First,",
+				"          Last,",
+				"          City,",
+				"          LessThan10K,",
+				"          MoreThan10K,",
+				"          MoreThan25K,",
+				"          {MoreThan50K }",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectParticularColumns",
+				"SanFrancisco sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
-				"     partitionFileNames:['\\'output/San-Francisco.csv\\''],",
+				"     partitionFileNames:[($output_file)],",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     partitionBy('hash', 1)) ~> sink1"
+				"     partitionBy('hash', 1)) ~> output"
 			]
 		}
 	}
