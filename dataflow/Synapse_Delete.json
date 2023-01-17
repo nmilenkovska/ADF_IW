@@ -1,0 +1,65 @@
+{
+	"name": "Synapse_Delete",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"name": "EDH"
+				},
+				{
+					"name": "Synapse"
+				}
+			],
+			"sinks": [
+				{
+					"name": "EDHstg"
+				}
+			],
+			"transformations": [
+				{
+					"name": "NotExist"
+				},
+				{
+					"name": "ChangeFlag"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     Query as string (\"SELECT [SourceSystemId] = 57  ,[TransactionID] = CONCAT(GJ.RECID,'_', GJAE.RecId) ,ChangeFlag = cast( 'D' as CHAR(1))  FROM [adl].[GeneralJournalEntry] GJ LEFT JOIN [adl].[GeneralJournalAccountEntry] GJAE on  GJAE.GENERALJOURNALENTRY = GJ.RecId      AND  GJAE.PARTITION = GJ.PARTITION LEFT JOIN [adl].[DimensionAttributeValueCombination] DC on DC.RECID = GJAE.LEDGERDIMENSION LEFT JOIN [adl].[MAINACCOUNT] ma on ma.RecId = GJAE.MainAccount WHERE      ma.TYPE in(1,2,3)      and cast(GJ.ACCOUNTINGDATE as date) >= \"),",
+				"     StartDate as string ('2022-06-02')",
+				"}",
+				"source(output(",
+				"          TransactionId as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     inferDriftedColumnTypes: true,",
+				"     wildcardPaths:[($Query)]) ~> EDH",
+				"source(output(",
+				"          SourceSystemId as integer,",
+				"          TransactionID as string,",
+				"          ChangeFlag as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false) ~> Synapse",
+				"EDH, Synapse exists(EDH@TransactionId == Synapse@TransactionID,",
+				"     negate:true,",
+				"     broadcast: 'auto')~> NotExist",
+				"NotExist derive(ChangeFlag = \"D\",",
+				"          TransactionId = TransactionId,",
+				"          SourceSystemId = 57) ~> ChangeFlag",
+				"ChangeFlag sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     mapColumn(",
+				"          TransactionId,",
+				"          ChangeFlag,",
+				"          SourceSystemId",
+				"     ),",
+				"     format: 'table') ~> EDHstg"
+			]
+		}
+	}
+}

@@ -1,0 +1,183 @@
+{
+	"name": "MDM_ForEach",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetProcs",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspGetMetadataExecuteProcs]",
+						"storedProcedureParameters": {
+							"Process": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Process",
+									"type": "Expression"
+								}
+							},
+							"Job": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetProcs",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetProcs').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 20,
+					"activities": [
+						{
+							"name": "Execute MDM Inport",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitOnCompletion": true,
+								"parameters": {
+									"Process": {
+										"value": "@pipeline().parameters.Process",
+										"type": "Expression"
+									},
+									"BatchId": {
+										"value": "@variables('BatchId')",
+										"type": "Expression"
+									},
+									"Job": {
+										"value": "@pipeline().parameters.Job",
+										"type": "Expression"
+									},
+									"Object": {
+										"value": "@item().name",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Fail1",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "Execute MDM Inport",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@concat('Error execution Pipelien ', pipeline().Pipeline, ' activity: ', item().name)",
+									"type": "Expression"
+								},
+								"errorCode": "200"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Insert Unidentified Values",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "ForEach1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "Dimension.usp_PopulateUnidentified"
+				}
+			}
+		],
+		"parameters": {
+			"Process": {
+				"type": "string",
+				"defaultValue": "mdmDim"
+			},
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			}
+		},
+		"variables": {
+			"BatchId": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "MDM"
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-01-13T06:07:53Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

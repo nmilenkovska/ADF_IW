@@ -1,0 +1,156 @@
+{
+	"name": "DW_ForEach",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetProcs",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlMISource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspGetMetadataExecuteProcs]",
+						"storedProcedureParameters": {
+							"Process": {
+								"value": {
+									"value": "@pipeline().parameters.Process",
+									"type": "Expression"
+								}
+							},
+							"Job": {
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetProcs",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetProcs').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Execute Procedure",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitOnCompletion": true,
+								"parameters": {
+									"Process": {
+										"value": "@pipeline().parameters.Process",
+										"type": "Expression"
+									},
+									"BatchId": {
+										"value": "@variables('BatchId')",
+										"type": "Expression"
+									},
+									"Job": {
+										"value": "@pipeline().parameters.Job",
+										"type": "Expression"
+									},
+									"Object": {
+										"value": "@item().name",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Fail1",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "Execute Procedure",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@concat('Error execution Pipelien ', pipeline().Pipeline, ' activity: ', item().name)",
+									"type": "Expression"
+								},
+								"errorCode": "200"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Process": {
+				"type": "string",
+				"defaultValue": "fact"
+			},
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			}
+		},
+		"variables": {
+			"BatchId": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "DW"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:25Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,306 @@
+{
+	"name": "01_STG_ForEach",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetProcs",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "Configuration.uspGetMetadataExecuteProcs",
+						"storedProcedureParameters": {
+							"Process": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Process",
+									"type": "Expression"
+								}
+							},
+							"Job": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach_Staging",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetProcs",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetProcs').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 20,
+					"activities": [
+						{
+							"name": "Load Staging",
+							"type": "Switch",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@item().name",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "Timesheet",
+										"activities": [
+											{
+												"name": "Fail1_copyTs_copy1",
+												"type": "Fail",
+												"dependsOn": [
+													{
+														"activity": "Run Process_Timesheet_copy1",
+														"dependencyConditions": [
+															"Failed"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"message": {
+														"value": "@concat('Error execution Pipelien ', pipeline().Pipeline)",
+														"type": "Expression"
+													},
+													"errorCode": "200"
+												}
+											},
+											{
+												"name": "Run Process_Timesheet_copy1",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitOnCompletion": true,
+													"parameters": {
+														"BatchId": {
+															"value": "@variables('BatchId')",
+															"type": "Expression"
+														},
+														"Job": {
+															"value": "@pipeline().parameters.Job",
+															"type": "Expression"
+														},
+														"Process": {
+															"value": "@pipeline().parameters.Process",
+															"type": "Expression"
+														},
+														"Object": {
+															"value": "@item().Name",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "EmployeeRateCard_D365",
+										"activities": [
+											{
+												"name": "Fail1_copyEmpRateCard",
+												"type": "Fail",
+												"dependsOn": [
+													{
+														"activity": "Load Emp Rate Dim",
+														"dependencyConditions": [
+															"Failed"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"message": {
+														"value": "@concat('Error execution Pipelien ', pipeline().Pipeline)",
+														"type": "Expression"
+													},
+													"errorCode": "200"
+												}
+											},
+											{
+												"name": "Run Process_EmployeeRateCard",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitOnCompletion": true,
+													"parameters": {
+														"BatchId": {
+															"value": "@variables('BatchId')",
+															"type": "Expression"
+														},
+														"Job": {
+															"value": "@pipeline().parameters.Job",
+															"type": "Expression"
+														},
+														"Process": {
+															"value": "@pipeline().parameters.Process",
+															"type": "Expression"
+														},
+														"Object": {
+															"value": "@item().Name",
+															"type": "Expression"
+														}
+													}
+												}
+											},
+											{
+												"name": "Load Emp Rate Dim",
+												"type": "SqlServerStoredProcedure",
+												"dependsOn": [
+													{
+														"activity": "Run Process_EmployeeRateCard",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"storedProcedureName": "Dimension.usp_PopulateEmployeeRates"
+												}
+											}
+										]
+									}
+								],
+								"defaultActivities": [
+									{
+										"name": "Fail1_PNL_copy1",
+										"type": "Fail",
+										"dependsOn": [
+											{
+												"activity": "Run Process_PNL_copy1",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"message": {
+												"value": "@concat('Error execution Pipelien ', pipeline().Pipeline)",
+												"type": "Expression"
+											},
+											"errorCode": "200"
+										}
+									},
+									{
+										"name": "Run Process_PNL_copy1",
+										"type": "ExecutePipeline",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitOnCompletion": true,
+											"parameters": {
+												"BatchId": {
+													"value": "@variables('BatchId')",
+													"type": "Expression"
+												},
+												"Job": {
+													"value": "@pipeline().parameters.Job",
+													"type": "Expression"
+												},
+												"Object": {
+													"value": "@item().name",
+													"type": "Expression"
+												},
+												"Process": {
+													"value": "@pipeline().parameters.Process",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Process": {
+				"type": "string",
+				"defaultValue": "Staging"
+			},
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			}
+		},
+		"variables": {
+			"PackageId": {
+				"type": "String"
+			},
+			"BatchId": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "STG"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:26Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

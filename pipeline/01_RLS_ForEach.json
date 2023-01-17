@@ -1,0 +1,207 @@
+{
+	"name": "01_RLS_ForEach",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Props",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Props').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "If Procedure",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@bool(item().IsStoredProcedure)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Load data from table",
+										"type": "ExecutePipeline",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitOnCompletion": true
+										}
+									},
+									{
+										"name": "Fail3",
+										"type": "Fail",
+										"dependsOn": [
+											{
+												"activity": "Load data from table",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"message": {
+												"value": "@concat('Error execution Pipeline ', pipeline().Pipeline)",
+												"type": "Expression"
+											},
+											"errorCode": "200"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Run procedure",
+										"type": "ExecutePipeline",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitOnCompletion": true,
+											"parameters": {
+												"Process": {
+													"value": "@pipeline().parameters.Process",
+													"type": "Expression"
+												},
+												"BatchId": {
+													"value": "@variables('BatchId')",
+													"type": "Expression"
+												},
+												"Job": {
+													"value": "@pipeline().parameters.Job",
+													"type": "Expression"
+												},
+												"Object": {
+													"value": "@item().name",
+													"type": "Expression"
+												}
+											}
+										}
+									},
+									{
+										"name": "Fail2",
+										"type": "Fail",
+										"dependsOn": [
+											{
+												"activity": "Run procedure",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"message": {
+												"value": "@concat('Error execution Pipeline', pipeline().Pipeline, ' activity: ', item().name)",
+												"type": "Expression"
+											},
+											"errorCode": "200"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Props",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspGetMetadataExecuteProcs]",
+						"storedProcedureParameters": {
+							"Process": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Process",
+									"type": "Expression"
+								}
+							},
+							"Job": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"Process": {
+				"type": "string",
+				"defaultValue": "RLS"
+			},
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			}
+		},
+		"variables": {
+			"PackageId": {
+				"type": "String"
+			},
+			"BatchId": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "RLS"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:26Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

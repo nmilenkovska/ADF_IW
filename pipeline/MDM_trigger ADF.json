@@ -1,0 +1,627 @@
+{
+	"name": "MDM_trigger ADF",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set PackageId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LogPackageStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PackageId",
+					"value": {
+						"value": "@string(activity('LogPackageStart').output.firstRow.id)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "LogPackageStart",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspPackage_log]",
+						"storedProcedureParameters": {
+							"batch_id": {
+								"type": "String",
+								"value": {
+									"value": "@variables('BatchId')",
+									"type": "Expression"
+								}
+							},
+							"details": {
+								"type": "String",
+								"value": null
+							},
+							"detailsXml": {
+								"type": "String",
+								"value": null
+							},
+							"id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_name": {
+								"type": "String",
+								"value": {
+									"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+									"type": "Expression"
+								}
+							},
+							"status": {
+								"type": "String",
+								"value": null
+							},
+							"user_name": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "LogPackageEnd_Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Success_copy1",
+						"dependencyConditions": [
+							"Skipped"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": "-1",
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": "0",
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Failed",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Get Client Id",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set PackageId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().globalParameters.MdmKeyVaultDns,\n'/secrets/',\npipeline().parameters.ClientId,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get Secret",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set PackageId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().globalParameters.MdmKeyVaultDns,\n'/secrets/',\npipeline().parameters.Secret,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get AAd Token",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get Client Id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get Secret",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get TenentId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get Secret Value",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://login.microsoftonline.com/'\n,activity('Get TenentId').output.value\n,'/oauth2/token')",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/x-www-form-urlencoded"
+					},
+					"body": {
+						"value": "@concat('grant_type=client_credentials&client_id='\n,activity('Get Client Id').output.value\n,'&client_secret='\n,activity('Get Secret Value').output.value\n,'&resource=https://management.azure.com')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "trigger MDM ADF",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get AAd Token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://management.azure.com/subscriptions/'\n,pipeline().parameters.Subscriptionid\n,'/resourceGroups/'\n,pipeline().parameters.ResourceGroup\n,'/providers/Microsoft.DataFactory/factories/'\n,pipeline().globalParameters.MDMadfName\n,'/pipelines/'\n,variables('pipelineName')\n,'/createRun?api-version=2018-06-01'\n)",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Authorization": {
+							"value": "@concat(string(activity('Get AAd Token').output.token_type),' ',\nstring(activity('Get AAd Token').output.access_token))",
+							"type": "Expression"
+						},
+						"Content-Type": "Application/json"
+					},
+					"body": {
+						"BatchId": "@variables('BatchId')",
+						"Job": "@pipeline().parameters.Job"
+					}
+				}
+			},
+			{
+				"name": "LogError_2",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Get AAd Token",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('Get AAd Token').output.Error.Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@pipeline().Pipeline",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogError_3",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "trigger MDM ADF",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('trigger MDM ADF').output.Error.Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@pipeline().Pipeline",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'PBIRefresh'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Fail1",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "LogPackageEnd_Error",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Error execution Pipelien ', pipeline().Pipeline)",
+						"type": "Expression"
+					},
+					"errorCode": "200"
+				}
+			},
+			{
+				"name": "Get TenentId",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set PackageId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().globalParameters.MdmKeyVaultDns,\n'/secrets/',\npipeline().parameters.Tenant,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get Secret Value",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set PackageId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().globalParameters.MdmKeyVaultDns,\n'/secrets/',\npipeline().parameters.SecretValue,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Log Package End Success_copy1",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "trigger MDM ADF",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": "-1",
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": null,
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Success",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"ClientId": {
+				"type": "string",
+				"defaultValue": "EDH-MDM-Integration-sp-ClientId"
+			},
+			"Secret": {
+				"type": "string",
+				"defaultValue": "EDH-MDM-Integration-sp-ClientSecret"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			},
+			"ResourceGroup": {
+				"type": "string",
+				"defaultValue": "GlobalBIResourceGroup"
+			},
+			"Tenant": {
+				"type": "string",
+				"defaultValue": "EDH-MDM-Integration-sp-TenantId"
+			},
+			"SecretValue": {
+				"type": "string",
+				"defaultValue": "EDH-MDM-Integration-sp-SecretValue"
+			},
+			"Subscriptionid": {
+				"type": "string",
+				"defaultValue": "7dca7ac1-4e1c-4813-92c8-98cd4167d765"
+			}
+		},
+		"variables": {
+			"PackageId": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"BatchId": {
+				"type": "String",
+				"defaultValue": "refreshBPBI"
+			},
+			"pipelineName": {
+				"type": "String",
+				"defaultValue": "00_Master_ALL"
+			},
+			"tenat": {
+				"type": "String",
+				"defaultValue": "6e8992ec-76d5-4ea5-8eae-b0c5e558749a"
+			}
+		},
+		"folder": {
+			"name": "MDM_Adf"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:25Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

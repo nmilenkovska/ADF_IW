@@ -1,0 +1,115 @@
+{
+	"name": "MDM_ADF_Run_ALL",
+	"properties": {
+		"activities": [
+			{
+				"name": "Trigger MDM ADF",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get Status",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Trigger MDM ADF",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Fail1",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "Get Status",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@activity('Get Status').output.Error.Message",
+						"type": "Expression"
+					},
+					"errorCode": "200"
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			}
+		},
+		"variables": {
+			"BatchId": {
+				"type": "String"
+			},
+			"counter": {
+				"type": "String"
+			},
+			"tryNr": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "MDM_Adf"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:26Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

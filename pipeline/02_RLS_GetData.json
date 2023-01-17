@@ -1,0 +1,535 @@
+{
+	"name": "02_RLS_GetData",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Log Package Start",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlMISource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspPackage_log]",
+						"storedProcedureParameters": {
+							"batch_id": {
+								"type": "String",
+								"value": {
+									"value": "@variables('BatchId')",
+									"type": "Expression"
+								}
+							},
+							"details": {
+								"type": "String",
+								"value": null
+							},
+							"detailsXml": {
+								"type": "String",
+								"value": null
+							},
+							"id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_name": {
+								"type": "String",
+								"value": {
+									"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+									"type": "Expression"
+								}
+							},
+							"status": {
+								"type": "String",
+								"value": null
+							},
+							"user_name": {
+								"type": "String",
+								"value": "FinanceEDHDev"
+							}
+						},
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "Set Package Id",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Log Package Start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PackageId",
+					"value": {
+						"value": "@string(activity('Log Package Start').output.firstRow.id)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Log Package End Success",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": null,
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": null,
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Success",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Log Package End Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Success",
+						"dependencyConditions": [
+							"Skipped"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": "-1",
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": "0",
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Failed",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Fail1",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "Restore",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Error execution Pipeline ', pipeline().Pipeline)",
+						"type": "Expression"
+					},
+					"errorCode": "200"
+				}
+			},
+			{
+				"name": "Copy Data",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Backup",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@activity('Get Details').output.firstRow.query",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "SqlMISink",
+						"preCopyScript": "TRUNCATE TABLE [RLS].[SecurityProfileUserConfig]",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"value": "@json(activity('Get Details').output.firstRow.mapping)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Log Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy Data",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('Copy Data').error.message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageId": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Backup",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Get Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[RLS].[uspBuckupRls]",
+					"storedProcedureParameters": {
+						"Flow": {
+							"value": "1",
+							"type": "Int32"
+						},
+						"Table": {
+							"value": "SecurityProfileUserConfig",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Restore",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Log Error",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[RLS].[uspRestoreRlsTable]",
+					"storedProcedureParameters": {
+						"Table": {
+							"value": "SecurityProfileUserConfig",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Delete Backup",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Success",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[RLS].[uspBuckupRls]",
+					"storedProcedureParameters": {
+						"Flow": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"Table": {
+							"value": "SecurityProfileUserConfig",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Get Details",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set Package Id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspGetMetadataExecuteProcs_details]",
+						"storedProcedureParameters": {
+							"Process": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Process",
+									"type": "Expression"
+								}
+							},
+							"Job": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							},
+							"Object": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Object",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			},
+			"Object": {
+				"type": "string",
+				"defaultValue": "SecurityProfileUserConfig"
+			},
+			"Process": {
+				"type": "string",
+				"defaultValue": "RLS"
+			}
+		},
+		"variables": {
+			"BatchId": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"PackageId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "RLS"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:25Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

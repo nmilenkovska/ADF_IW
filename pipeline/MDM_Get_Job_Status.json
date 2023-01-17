@@ -1,0 +1,788 @@
+{
+	"name": "MDM_Get_Job_Status",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Log Package Start",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlMISource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspPackage_log]",
+						"storedProcedureParameters": {
+							"batch_id": {
+								"type": "String",
+								"value": {
+									"value": "@variables('BatchId')",
+									"type": "Expression"
+								}
+							},
+							"details": {
+								"type": "String",
+								"value": null
+							},
+							"detailsXml": {
+								"type": "String",
+								"value": null
+							},
+							"id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_name": {
+								"type": "String",
+								"value": {
+									"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+									"type": "Expression"
+								}
+							},
+							"status": {
+								"type": "String",
+								"value": null
+							},
+							"user_name": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "Set Package Id",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Log Package Start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PackageId",
+					"value": {
+						"value": "@string(activity('Log Package Start').output.firstRow.id)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Log Package End Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Error_copy1",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": "-1",
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": "0",
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Failed",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Fail1",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Error",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Error execution Pipelien ', pipeline().Pipeline)",
+						"type": "Expression"
+					},
+					"errorCode": "200"
+				}
+			},
+			{
+				"name": "If Condition Staus",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Until Status is Pending",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(toLower(variables('status')),'success')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Fail1_copy1_copy1",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "Log Package End Error_copy2",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@concat('Error execution Pipelien ', pipeline().Pipeline)",
+									"type": "Expression"
+								},
+								"errorCode": "200"
+							}
+						},
+						{
+							"name": "Log Package End Error_copy2",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Configuration].[uspPackage_log]",
+								"storedProcedureParameters": {
+									"batch_id": {
+										"value": {
+											"value": "@pipeline().parameters.BatchId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"details": {
+										"value": "-1",
+										"type": "String"
+									},
+									"detailsXml": {
+										"value": null,
+										"type": "String"
+									},
+									"id": {
+										"value": "0",
+										"type": "Int64"
+									},
+									"package_id": {
+										"value": {
+											"value": "@variables('PackageId')",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"package_name": {
+										"value": {
+											"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"status": {
+										"value": "Failed",
+										"type": "String"
+									},
+									"user_name": {
+										"value": {
+											"value": "@pipeline().parameters.Job",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Log Package End Success_copy1",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Configuration].[uspPackage_log]",
+								"storedProcedureParameters": {
+									"batch_id": {
+										"value": {
+											"value": "@pipeline().parameters.BatchId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"details": {
+										"value": {
+											"value": "@concat(\n'{\"Status\": \"'\n,variables('status')\n,'\"}'\n)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"detailsXml": {
+										"value": null,
+										"type": "String"
+									},
+									"id": {
+										"value": null,
+										"type": "Int64"
+									},
+									"package_id": {
+										"value": {
+											"value": "@variables('PackageId')",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"package_name": {
+										"value": {
+											"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"status": {
+										"value": "Success",
+										"type": "String"
+									},
+									"user_name": {
+										"value": "ADF USER",
+										"type": "String"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Log Package End Error_copy1",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "If Condition Staus",
+						"dependencyConditions": [
+							"Skipped"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": "-1",
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": "0",
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Failed",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Until Status is Pending",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "Set Package Id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@or( greaterOrEquals(int(variables('tryNr')),add(pipeline().parameters.retryGetStatus,-1)) , not(equals(toLower(variables('status')),'in progress')))",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Increment counter",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "counter",
+								"value": {
+									"value": "@string(add(int(variables('tryNr')) ,1))",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set tryNr",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Increment counter",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "tryNr",
+								"value": {
+									"value": "@variables('counter')",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Get Details",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Set tryNr",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "@concat(\n'select top 1 status from Configuration.PackageLog\nwhere packagename like ''%00_Master_ALL''\nand BatchID = '''\n,variables('BatchId')\n,''''\n)",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								}
+							}
+						},
+						{
+							"name": "Set var Status",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Get Details",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "status",
+								"value": {
+									"value": "@activity('Get Details').output.firstRow.status",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "If Condition1",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Set var Status",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@and( lessOrEquals(int(variables('tryNr')),pipeline().parameters.retryGetStatus) , equals(toLower(variables('status')),'in progress'))",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Set tryNr_copy1",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "tryNr",
+											"value": {
+												"value": "@string(pipeline().parameters.retryGetStatus)",
+												"type": "Expression"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Wait1",
+										"type": "Wait",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitTimeInSeconds": {
+												"value": "@pipeline().parameters.waitTimeSeconds",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Log Error",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Get Details",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Configuration].[uspLogError]",
+								"storedProcedureParameters": {
+									"Batchid": {
+										"value": {
+											"value": "@variables('BatchId')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"error": {
+										"value": {
+											"value": "@activity('Get Details').error.message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"PackageId": {
+										"value": {
+											"value": "@variables('PackageId')",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"PackageName": {
+										"value": {
+											"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							}
+						},
+						{
+							"name": "Set tryNr_copy2",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "If Condition1",
+									"dependencyConditions": [
+										"Skipped"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "tryNr",
+								"value": {
+									"value": "@string(pipeline().parameters.retryGetStatus)",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"timeout": "0.12:00:00"
+				}
+			},
+			{
+				"name": "Log Package End Error_copy3",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "If Condition Staus",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": "-1",
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": "0",
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Failed",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Fail1_copy1",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Error_copy3",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Error execution Pipelien ', pipeline().Pipeline)",
+						"type": "Expression"
+					},
+					"errorCode": "200"
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			},
+			"waitTimeSeconds": {
+				"type": "int",
+				"defaultValue": 300
+			},
+			"retryGetStatus": {
+				"type": "int",
+				"defaultValue": 20
+			}
+		},
+		"variables": {
+			"PackageId": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"BatchId": {
+				"type": "String",
+				"defaultValue": "RunALL"
+			},
+			"status": {
+				"type": "String",
+				"defaultValue": "Failed"
+			},
+			"counter": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"tryNr": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDM_Adf"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:25Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

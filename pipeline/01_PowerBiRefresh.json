@@ -1,0 +1,991 @@
+{
+	"name": "01_PowerBiRefresh",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'PBIRefresh'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "LogPackageStart",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspPackage_log]",
+						"storedProcedureParameters": {
+							"batch_id": {
+								"type": "String",
+								"value": {
+									"value": "@variables('BatchId')",
+									"type": "Expression"
+								}
+							},
+							"details": {
+								"type": "String",
+								"value": null
+							},
+							"detailsXml": {
+								"type": "String",
+								"value": null
+							},
+							"id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_name": {
+								"type": "String",
+								"value": {
+									"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+									"type": "Expression"
+								}
+							},
+							"status": {
+								"type": "String",
+								"value": null
+							},
+							"user_name": {
+								"type": "String",
+								"value": "ADF USER"
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "Set PackageId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LogPackageStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PackageId",
+					"value": {
+						"value": "@string(activity('LogPackageStart').output.firstRow.id)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get_Notification_Details",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set PackageId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "select Details from [Configuration].[Metadata] where [Name] = 'Recipients'",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "set Email",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get_Notification_Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "EmailSuccess",
+					"value": {
+						"value": "@activity('Get_Notification_Details').output.firstRow.Details",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get_Refresh_Details",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "set Email",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "select Query, Query2 from [Configuration].[Metadata] where [Type] = 'PowerBI'",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "Set WorkSpaceId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get_Refresh_Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "WorkspaceId",
+					"value": {
+						"value": "@activity('Get_Refresh_Details').output.firstRow.Query",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set DatasetId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get_Refresh_Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "DatasetId",
+					"value": {
+						"value": "@activity('Get_Refresh_Details').output.firstRow.Query2",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get tenant Id",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set WorkSpaceId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().globalParameters.KeyVaultDns,\n'/secrets/',\npipeline().parameters.TenantidSecret,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get Client Id",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set WorkSpaceId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().globalParameters.KeyVaultDns,\n'/secrets/',\npipeline().parameters.ClientIdSecret,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get Secret",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set DatasetId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().globalParameters.KeyVaultDns,\n'/secrets/',\npipeline().parameters.Secret,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get AAd Token",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get tenant Id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get Client Id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get Secret",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://login.microsoftonline.com/',\nactivity('Get tenant Id').output.value,\n'/oauth2/token')",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/x-www-form-urlencoded"
+					},
+					"body": {
+						"value": "@concat('tenant=',activity('Get tenant Id').output.value,\n'&client_id=',activity('Get Client Id').output.value,\n'&client_secret=',activity('Get Secret').output.value,\n'&grant_type=client_credentials&resource=https://analysis.windows.net/powerbi/api')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get All datasources",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get AAd Token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://api.powerbi.com/v1.0/myorg/groups/',\nvariables('WorkspaceId'),\n'/datasets'\n)",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"headers": {
+						"Authorization": {
+							"value": "@concat(string(activity('Get AAd Token').output.token_type),' ',\nstring(activity('Get AAd Token').output.access_token))",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogError_2",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Get AAd Token",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('Get AAd Token').output.Error.Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageId": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Object)",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogError_3",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Get All datasources",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('Get All datasources').output.Error.Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageId": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Object)",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Refresh DataSet",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get All datasources",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://api.powerbi.com/v1.0/myorg/groups/',\nvariables('WorkspaceId'),\n'/datasets/',\nvariables('DatasetId'),\n'/refreshes')",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Authorization": {
+							"value": "@concat(string(activity('Get AAd Token').output.token_type),' ',\nstring(activity('Get AAd Token').output.access_token))",
+							"type": "Expression"
+						}
+					},
+					"body": {
+						"refresh": "Hello_Refresh"
+					}
+				}
+			},
+			{
+				"name": "UntilRefresh finishes",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "Refresh DataSet",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@not(equals('Unknown', variables('RefreshStatus')))",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 30
+							}
+						},
+						{
+							"name": "Get Refresh Status",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Wait1",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@concat('https://api.powerbi.com/v1.0/myorg/groups/',\nvariables('WorkspaceId'),\n'/datasets/',\nvariables('DatasetId'),\n'/refreshes?$top=1')",
+									"type": "Expression"
+								},
+								"method": "GET",
+								"headers": {
+									"Authorization": {
+										"value": "@concat(string(activity('Get AAd Token').output.token_type),' ',\nstring(activity('Get AAd Token').output.access_token))",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Set refreshStatus",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Get Refresh Status",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "RefreshStatus",
+								"value": {
+									"value": "@activity('Get Refresh Status').output.value[0].status",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"timeout": "0.12:00:00"
+				}
+			},
+			{
+				"name": "LogError",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Refresh DataSet",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('Refresh DataSet').Error.Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageId": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Object)",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "If RefreshStatus Succeeded",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "UntilRefresh finishes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(variables('RefreshStatus'), 'Completed')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "LogError_No refresh",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Configuration].[uspLogError]",
+								"storedProcedureParameters": {
+									"Batchid": {
+										"value": {
+											"value": "@variables('BatchId')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"error": {
+										"value": {
+											"value": "@concat('PowerBi Nor Refresjed. Refresh status status is: ',variables('RefreshStatus'))",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"PackageId": {
+										"value": {
+											"value": "@variables('PackageId')",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"PackageName": {
+										"value": {
+											"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Object)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							}
+						},
+						{
+							"name": "LogPackageEnd_Refresh_Failed",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "LogError_No refresh",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Configuration].[uspPackage_log]",
+								"storedProcedureParameters": {
+									"batch_id": {
+										"value": {
+											"value": "@pipeline().parameters.BatchId",
+											"type": "Expression"
+										}
+									},
+									"details": {
+										"value": null
+									},
+									"detailsXml": {
+										"value": null
+									},
+									"id": {
+										"value": "0"
+									},
+									"package_id": {
+										"value": {
+											"value": "@variables('BatchId')",
+											"type": "Expression"
+										}
+									},
+									"package_name": {
+										"value": {
+											"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Object)",
+											"type": "Expression"
+										}
+									},
+									"status": {
+										"value": "Failed"
+									},
+									"user_name": {
+										"value": "ADF USER"
+									}
+								}
+							}
+						},
+						{
+							"name": "Send Failure Notification",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "LogPackageEnd_Refresh_Failed",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitOnCompletion": true,
+								"parameters": {
+									"BatchId": {
+										"value": "@variables('BatchId')",
+										"type": "Expression"
+									},
+									"Status": "Fail",
+									"pipelineName": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"Job": {
+										"value": "@pipeline().parameters.Job",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "LogPackageEnd_Refresh_Success",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Configuration].[uspPackage_log]",
+								"storedProcedureParameters": {
+									"batch_id": {
+										"value": {
+											"value": "@variables('BatchId')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"details": {
+										"value": null,
+										"type": "String"
+									},
+									"detailsXml": {
+										"value": null,
+										"type": "String"
+									},
+									"id": {
+										"value": "0",
+										"type": "Int64"
+									},
+									"package_id": {
+										"value": {
+											"value": "@variables('PackageId')",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"package_name": {
+										"value": {
+											"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Object)",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"status": {
+										"value": "Success",
+										"type": "String"
+									},
+									"user_name": {
+										"value": "ADF USER",
+										"type": "String"
+									}
+								}
+							}
+						},
+						{
+							"name": "Send success Notification",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "LogPackageEnd_Refresh_Success",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitOnCompletion": true,
+								"parameters": {
+									"BatchId": {
+										"value": "@variables('BatchId')",
+										"type": "Expression"
+									},
+									"Status": "Success",
+									"pipelineName": {
+										"value": "@pipeline().Pipeline",
+										"type": "Expression"
+									},
+									"Job": {
+										"value": "@pipeline().parameters.Job",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"TenantidSecret": {
+				"type": "string",
+				"defaultValue": "SpTenantId"
+			},
+			"ClientIdSecret": {
+				"type": "string",
+				"defaultValue": "SpClientId"
+			},
+			"Secret": {
+				"type": "string",
+				"defaultValue": "SpSecretValue"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			},
+			"Process": {
+				"type": "string",
+				"defaultValue": "Refresh"
+			},
+			"Object": {
+				"type": "string",
+				"defaultValue": "PowerBI"
+			}
+		},
+		"variables": {
+			"PackageId": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"WorkspaceId": {
+				"type": "String",
+				"defaultValue": "test"
+			},
+			"DatasetName": {
+				"type": "String",
+				"defaultValue": "test"
+			},
+			"DatasetId": {
+				"type": "String",
+				"defaultValue": "test"
+			},
+			"RefreshStatus": {
+				"type": "String",
+				"defaultValue": "Unknown"
+			},
+			"LogicApp": {
+				"type": "String"
+			},
+			"EmailSuccess": {
+				"type": "String"
+			},
+			"EmailFail": {
+				"type": "String"
+			},
+			"BatchId": {
+				"type": "String",
+				"defaultValue": "refreshBPBI"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:26Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

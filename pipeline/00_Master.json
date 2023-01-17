@@ -1,0 +1,570 @@
+{
+	"name": "00_Master",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Log Package Start",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlMISource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspPackage_log]",
+						"storedProcedureParameters": {
+							"batch_id": {
+								"type": "String",
+								"value": {
+									"value": "@variables('BatchId')",
+									"type": "Expression"
+								}
+							},
+							"details": {
+								"type": "String",
+								"value": null
+							},
+							"detailsXml": {
+								"type": "String",
+								"value": null
+							},
+							"id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_name": {
+								"type": "String",
+								"value": {
+									"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+									"type": "Expression"
+								}
+							},
+							"status": {
+								"type": "String",
+								"value": null
+							},
+							"user_name": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "Set Package Id",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Log Package Start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PackageId",
+					"value": {
+						"value": "@string(activity('Log Package Start').output.firstRow.id)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Log Package End Success",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "PowerBI Dataset Refresh",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": null,
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": null,
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Success",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Log Package End Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "PowerBI Dataset Refresh",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": "-1",
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": "0",
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Failed",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Fail1",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "Execute PipelineSend Notif Fail",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Error execution Pipelien ', pipeline().Pipeline)",
+						"type": "Expression"
+					},
+					"errorCode": "200"
+				}
+			},
+			{
+				"name": "ODS - move",
+				"description": "Move data from STg to ODS ( PNL)",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "STG -  Get Data",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"Process": "ODS",
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "STG -  Get Data",
+				"description": "Import PNl from D365 Synapse and Sensei",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Set Package Id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"Process": "Staging",
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Execute PipelineSend Notif Success",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Success",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Status": "Success",
+						"pipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Execute PipelineSend Notif Fail",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Error",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Status": "Failed",
+						"pipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "DW- create Fact",
+				"description": "Execute:\nDims in MDM database\nget Dims from MDM db to Finance DB\nfact",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "MDM Dims",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"Process": {
+							"value": "Fact",
+							"type": "Expression"
+						},
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "MDM Dims",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "MDM Trigger Job",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"Process": "mdmDim",
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "MDM Trigger Job",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "ODS - move",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "RLS - Import data from RLS DB",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "DW- Allocation-FactCP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"Process": "RLS",
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "DW- Allocation-FactCP",
+				"description": "Execute:\nRun Allocation Engine SP's to get the final FACT.CP",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "DW- create Fact",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"Process": {
+							"value": "Allocation",
+							"type": "Expression"
+						},
+						"BatchId": {
+							"value": "@variables('BatchId')",
+							"type": "Expression"
+						},
+						"Job": {
+							"value": "@pipeline().parameters.Job",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "PowerBI Dataset Refresh",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "RLS - Import data from RLS DB",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchId": "RunALL",
+						"TenantidSecret": "SpTenantId",
+						"ClientIdSecret": "SpClientId",
+						"Secret": "SpSecretValue",
+						"Job": "Finance",
+						"Process": "Refresh",
+						"Object": "PowerBI"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			}
+		},
+		"variables": {
+			"BatchId": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"PackageId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:27Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

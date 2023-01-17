@@ -1,0 +1,196 @@
+{
+	"name": "01_SentNotifications",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set Notif Succsess",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "emailContent",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set Email Recipients",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set DfName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@pipeline().globalParameters.LogicUpURL",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"body": {
+						"dataFactoryName": "@variables('DfName')",
+						"pipelineName": "@pipeline().parameters.pipelineName",
+						"recipient": "@variables('emailRecipients')",
+						"batchId": "@pipeline().parameters.BatchId",
+						"status": "@pipeline().parameters.Status",
+						"process": "@pipeline().parameters.Job",
+						"emailTable": "@variables('emailTable')"
+					}
+				}
+			},
+			{
+				"name": "GetData",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlMISource",
+						"sqlReaderQuery": {
+							"value": "@concat(variables('query'), \npipeline().parameters.BatchId, '''', \n'FOR JSON AUTO )')",
+							"type": "Expression"
+						},
+						"partitionOption": "None"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "emailContent",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "GetData",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "emailTable",
+					"value": {
+						"value": "@activity('GetData').output.firstRow.emailtable",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get Recipients",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlMISource",
+						"sqlReaderQuery": {
+							"value": "@concat('DECLARE @Status nvarchar(20) = ''',pipeline().parameters.Status\n,''',@Job nvarchar(20) =''', pipeline().parameters.Job,'''\nSELECT  m.[Details]\n       , Recipients = COALESCE(JSON_VALUE(j.[Details], ''$.''+@Status), JSON_VALUE(m.[Details], ''$.''+@Status))\n  FROM [Configuration].Metadata m\n  LEFT JOIN [Configuration].[JobsMetadata] j on j.Type = m.Type and j.Object = m.Name\n  and j.name = @Job\n  where m.Type = ''Notifications''\n  and m.Name = ''Recipients''')",
+							"type": "Expression"
+						},
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "Set Email Recipients",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get Recipients",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "emailRecipients",
+					"value": {
+						"value": "@activity('Get Recipients').output.firstRow.Recipients",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set DfName",
+				"description": "@concat(pipeline().parameters.Job,'_',pipeline().DataFactory)",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "DfName",
+					"value": {
+						"value": "@concat(pipeline().parameters.Job,'_',pipeline().DataFactory)",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "31fe57ac-9b36-4059-ad54-b33b8968f20d"
+			},
+			"Status": {
+				"type": "string",
+				"defaultValue": "Failed"
+			},
+			"pipelineName": {
+				"type": "string",
+				"defaultValue": "test"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			}
+		},
+		"variables": {
+			"query": {
+				"type": "String",
+				"defaultValue": " Select emailtable = ( SELECT [PackageName]       ,[BatchID]       ,[Status]       ,[StartDate]       ,[EndDate]       ,[Duration]       ,[Details]  , [Error] FROM [Configuration].[vwPackageLog] where  batchid = '"
+			},
+			"emailTable": {
+				"type": "String"
+			},
+			"emailRecipients": {
+				"type": "String",
+				"defaultValue": "snejana.turcu@dentsu.com"
+			},
+			"DfName": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:25Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

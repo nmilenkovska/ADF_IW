@@ -1,0 +1,906 @@
+{
+	"name": "02_STG_PNL",
+	"properties": {
+		"activities": [
+			{
+				"name": "Log Package Start",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set variable BatchId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspPackage_log]",
+						"storedProcedureParameters": {
+							"batch_id": {
+								"type": "String",
+								"value": {
+									"value": "@variables('BatchId')",
+									"type": "Expression"
+								}
+							},
+							"details": {
+								"type": "String",
+								"value": null
+							},
+							"detailsXml": {
+								"type": "String",
+								"value": null
+							},
+							"id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_id": {
+								"type": "Int64",
+								"value": "0"
+							},
+							"package_name": {
+								"type": "String",
+								"value": {
+									"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Process,'_',pipeline().parameters.Object)\n",
+									"type": "Expression"
+								}
+							},
+							"status": {
+								"type": "String",
+								"value": null
+							},
+							"user_name": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "Set Package Id",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Log Package Start",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PackageId",
+					"value": {
+						"value": "@string(activity('Log Package Start').output.firstRow.id)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get Details",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set Package Id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Configuration].[uspGetMetadataExecuteProcs_details]",
+						"storedProcedureParameters": {
+							"Process": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Process",
+									"type": "Expression"
+								}
+							},
+							"Job": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Job",
+									"type": "Expression"
+								}
+							},
+							"Object": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.Object",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "Set var LastRefresh",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "LastRefresh",
+					"value": {
+						"value": "@if(\nbool(activity('Get Details').output.firstRow.fullLoad)\n,activity('Get Details').output.firstRow.startDate\n,coalesce(activity('Get Details').output.firstRow.lastRefresh\n    ,activity('Get Details').output.firstRow.startDate\n    ))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Create Indexes",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "If Condition D365 and Incremental",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "Staging.uspDropRecreateIndexes ",
+					"storedProcedureParameters": {
+						"Source": {
+							"value": {
+								"value": "@activity('Get Details').output.firstRow.source",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Type": {
+							"value": "1",
+							"type": "Int32"
+						}
+					}
+				}
+			},
+			{
+				"name": "Log Package End Success",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Set nrRows copied",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": {
+								"value": "@variables('rowsCopied')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": null,
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Success",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Log Package End Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Success",
+						"dependencyConditions": [
+							"Skipped"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspPackage_log]",
+					"storedProcedureParameters": {
+						"batch_id": {
+							"value": {
+								"value": "@pipeline().parameters.BatchId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"details": {
+							"value": null,
+							"type": "String"
+						},
+						"detailsXml": {
+							"value": null,
+							"type": "String"
+						},
+						"id": {
+							"value": "0",
+							"type": "Int64"
+						},
+						"package_id": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"package_name": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"status": {
+							"value": "Failed",
+							"type": "String"
+						},
+						"user_name": {
+							"value": "ADF USER",
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set nrRows copied",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get nr Rows inprted",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "rowsCopied",
+					"value": {
+						"value": "@concat(\n'{\"Logs\":\n[{\"FullLoad\":\"'\n,activity('Get Details').output.firstRow.fullLoad\n,'\",\"UPDATE\":',activity('Get nr Rows inprted').output.firstRow.U\n,',\"INSERT\":',activity('Get nr Rows inprted').output.firstRow.I\n,',\"DELETE\":',activity('Get nr Rows inprted').output.firstRow.D,',}]}\n}')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get nr Rows inprted",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Create Indexes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat(\n'Declare @LoadType Bit = ''',activity('Get Details').output.firstRow.fullLoad,'''',\n'select LoadType = CASE WHEN @LoadType = 1 then ''FullLoad'' ELSE ''Incremental'' END\n, [I] = COALESCE([I], 0), [U] = COALESCE([U], 0), [D] = COALESCE([D], 0)\nfrom(\n\tselect ChangeFlag = COALESCE(ChangeFlag,''U''), Rows = count(1)\n\t\tfrom staging.PandL_',activity('Get Details').output.firstRow.source,' group by ChangeFlag\n\t\tUNION ALL Select ChangeFlag = ''U'', Rows = 0 ) as source\n\tPIVOT( sum(Rows) for ChangeFlag in ([I], [U], [D])\n\t) as piv')",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "FailMain",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Error",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": {
+						"value": "@concat('Error execution Pipelien ', pipeline().Pipeline,'_',activity('Get Details').output.firstRow.source)",
+						"type": "Expression"
+					},
+					"errorCode": "200"
+				}
+			},
+			{
+				"name": "Set variable BatchId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set CurrentDateTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchId",
+					"value": {
+						"value": "@if(equals(pipeline().parameters.BatchId, 'RunALL'), pipeline().RunId,pipeline().parameters.BatchId)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set Secret",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Secret",
+					"value": {
+						"value": "@activity('Get Details').output.firstRow.secret",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set CurrentDateTime",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "CurrentDateTime",
+					"value": {
+						"value": "@formatDateTime(utcNow(), 'yyyy-MM-dd hh:mm:ss')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set Refresh Date",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Log Package End Success",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat(\n 'UPDATE [Configuration].[Metadata] SET [LastRefreshDate] ='''\n ,variables('CurrentDateTime'),''''\n ,' WHERE Name='''\n ,pipeline().parameters.Object,''''\n ,' and Type=''',pipeline().parameters.Process,''''\n ,' SELECT Rows=@@ROWCOUNT')\n ",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					}
+				}
+			},
+			{
+				"name": "If Condition D365 and Incremental",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Get Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@and(equals(activity('Get Details').output.firstRow.fullLoad,'false'),\nequals(activity('Get Details').output.firstRow.source,'D365')\n)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Deleted Rows",
+							"type": "ExecuteDataFlow",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "1.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"compute": {
+									"coreCount": 8,
+									"computeType": "General"
+								},
+								"traceLevel": "Fine"
+							}
+						},
+						{
+							"name": "FailMain_copy1_copy1",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "Log Error_copy1",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@concat('Error execution Pipelien ', pipeline().Pipeline,'_',activity('Get Details').output.firstRow.source)",
+									"type": "Expression"
+								},
+								"errorCode": "200"
+							}
+						},
+						{
+							"name": "Log Error_copy1",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Deleted Rows",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[Configuration].[uspLogError]",
+								"storedProcedureParameters": {
+									"Batchid": {
+										"value": {
+											"value": "@variables('BatchId')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"error": {
+										"value": {
+											"value": "@activity('Deleted Rows').error.message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"PackageId": {
+										"value": {
+											"value": "@variables('PackageId')",
+											"type": "Expression"
+										},
+										"type": "Int64"
+									},
+									"PackageName": {
+										"value": {
+											"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Process,'_',pipeline().parameters.Object)\n",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Log Error_Get Details",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Get Details",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('Get Details').error.message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageId": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Process,'_',pipeline().parameters.Object)\n",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Get Data",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Drop Indexes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat(\n'Declare @AccountingDate date = '\n,'''',activity('Get Details').output.firstRow.startDate,''' '\n,'Declare @ChangeDate DateTime = '\n,'''',variables('LastRefresh'),'''\n '\n,activity('Get Details').output.firstRow.query\n)",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": {
+							"value": "@{concat(\n'Truncate Table Staging.PandL_'\n,activity('Get Details').output.firstRow.source)}",
+							"type": "Expression"
+						},
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"value": "@json(activity('Get Details').output.firstRow.mapping)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Drop Indexes",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Set var LastRefresh",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set Secret",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "Staging.uspDropRecreateIndexes ",
+					"storedProcedureParameters": {
+						"Source": {
+							"value": {
+								"value": "@activity('Get Details').output.firstRow.source",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"Type": {
+							"value": "0",
+							"type": "Int32"
+						}
+					}
+				}
+			},
+			{
+				"name": "Log Error_drop indexes",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Drop Indexes",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('Drop Indexes').error.message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageId": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Process,'_',pipeline().parameters.Object)\n",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			},
+			{
+				"name": "Log Error_Copy",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Get Data",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[Configuration].[uspLogError]",
+					"storedProcedureParameters": {
+						"Batchid": {
+							"value": {
+								"value": "@variables('BatchId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"error": {
+							"value": {
+								"value": "@activity('Get Data').error.message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PackageId": {
+							"value": {
+								"value": "@variables('PackageId')",
+								"type": "Expression"
+							},
+							"type": "Int64"
+						},
+						"PackageName": {
+							"value": {
+								"value": "@concat(pipeline().DataFactory,'_',pipeline().Pipeline, '_',pipeline().parameters.Process,'_',pipeline().parameters.Object)\n",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchId": {
+				"type": "string",
+				"defaultValue": "RunALL"
+			},
+			"Job": {
+				"type": "string",
+				"defaultValue": "Finance"
+			},
+			"Object": {
+				"type": "string",
+				"defaultValue": "Pnl_D365"
+			},
+			"Process": {
+				"type": "string",
+				"defaultValue": "Staging"
+			}
+		},
+		"variables": {
+			"BatchId": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"PackageId": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"LastRefresh": {
+				"type": "String"
+			},
+			"FullLoad": {
+				"type": "String"
+			},
+			"rowsCopied": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"CurrentDateTime": {
+				"type": "String"
+			},
+			"Secret": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "STG"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-12-01T10:19:26Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

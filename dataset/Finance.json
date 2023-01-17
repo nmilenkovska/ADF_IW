@@ -1,0 +1,33 @@
+{
+	"name": "Finance",
+	"properties": {
+		"parameters": {
+			"Secret": {
+				"type": "string",
+				"defaultValue": "FinanceEdh"
+			},
+			"TableName": {
+				"type": "string",
+				"defaultValue": "PackageLog"
+			},
+			"SchemaName": {
+				"type": "string",
+				"defaultValue": "Configuration"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": {
+				"value": "@dataset().SchemaName",
+				"type": "Expression"
+			},
+			"table": {
+				"value": "@dataset().TableName",
+				"type": "Expression"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
