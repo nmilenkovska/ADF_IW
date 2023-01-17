@@ -1,0 +1,40 @@
+{
+	"name": "CSV",
+	"properties": {
+		"parameters": {
+			"FileName": {
+				"type": "string",
+				"defaultValue": "CostCenter_RollUp_13012022.csv"
+			},
+			"folder": {
+				"type": "string",
+				"defaultValue": "pnl-row_bronse"
+			}
+		},
+		"folder": {
+			"name": "TEST"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().FileName",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().folder",
+					"type": "Expression"
+				},
+				"container": "poc-row"
+			},
+			"columnDelimiter": ";",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

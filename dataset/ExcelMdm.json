@@ -1,0 +1,34 @@
+{
+	"name": "ExcelMdm",
+	"properties": {
+		"parameters": {
+			"FileName": {
+				"type": "string",
+				"defaultValue": "BPC_CompanyTable_20210511.xlsx"
+			},
+			"Sheet": {
+				"type": "int",
+				"defaultValue": 0
+			}
+		},
+		"folder": {
+			"name": "TEST"
+		},
+		"annotations": [],
+		"type": "Excel",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().FileName",
+					"type": "Expression"
+				},
+				"container": "edh-fin-mdm"
+			},
+			"sheetIndex": 0,
+			"firstRowAsHeader": true
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
