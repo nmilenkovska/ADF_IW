@@ -397,6 +397,7 @@
 			},
 			{
 				"name": "MDM Dims",
+				"description": " test",
 				"type": "ExecutePipeline",
 				"dependsOn": [
 					{
@@ -408,18 +409,7 @@
 				],
 				"userProperties": [],
 				"typeProperties": {
-					"waitOnCompletion": true,
-					"parameters": {
-						"Process": "mdmDim",
-						"BatchId": {
-							"value": "@variables('BatchId')",
-							"type": "Expression"
-						},
-						"Job": {
-							"value": "@pipeline().parameters.Job",
-							"type": "Expression"
-						}
-					}
+					"waitOnCompletion": true
 				}
 			},
 			{
